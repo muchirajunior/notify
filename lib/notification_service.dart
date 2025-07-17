@@ -1,34 +1,47 @@
+import 'dart:developer';
+import 'dart:isolate';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
-  static FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =  FlutterLocalNotificationsPlugin();
- 
-  static  initialize()async{
-    AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@minimap/ic_launcher');
-    final DarwinInitializationSettings initializationSettingsDarwin =
+  static FlutterLocalNotificationsPlugin localNotificationsPlugin =  FlutterLocalNotificationsPlugin();
+
+    static AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@minimap/ic_launcher');
+    static   final DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
       requestSoundPermission: false,
       requestBadgePermission: false,
       requestAlertPermission: false,
     );
-    final LinuxInitializationSettings initializationSettingsLinux = LinuxInitializationSettings(defaultActionName: 'Notify');
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsDarwin,
-      linux: initializationSettingsLinux,
-    );
-
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
-        // Handle notification response
-        print('Notification tapped: ${notificationResponse.id}');
-      },
-    );
+    static final LinuxInitializationSettings initializationSettingsLinux = LinuxInitializationSettings(defaultActionName: 'Notify');
+     
+ 
+  static  initialize(FlutterLocalNotificationsPlugin plugin)async{
+    try {
+     
+       final InitializationSettings initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
+        linux: initializationSettingsLinux,
+      );
+      await plugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
+          // Handle notification response
+          log('Notification tapped: ${notificationResponse.id}');
+        },
+      );
+    } on Exception catch (e) {
+      log(e.toString(), name: 'NotificationService.initialize');
+    }
   }
 
-  static Future<void> showNotification(int id, String title, String body) async {
-    AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+  static Future<void> showNotification({
+    required FlutterLocalNotificationsPlugin plugin,
+    required int id,
+    required String title,
+    required String body,
+  }) async {AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
       'com_notify_app',
       'com_notify_app',
       channelDescription: 'Notify App Notifications',
@@ -41,7 +54,44 @@ class NotificationService {
       android: androidPlatformChannelSpecifics,
     );
 
-    await flutterLocalNotificationsPlugin.show(id, title, body, platformChannelSpecifics);
+    await plugin.show(id, title, body, platformChannelSpecifics);
+  }
+
+
+  static Future<void> runBGService() async {
+    final ReceivePort receivePort = ReceivePort();
+    await Isolate.spawn(_backgroundHandler, receivePort.sendPort, debugName: 'NotificationServiceBackground');
+    receivePort.listen((dynamic message) {
+      // Handle messages from the background isolate
+      log('Message from background isolate: $message');
+    });
+  }
+
+  static Future<void> _backgroundHandler(SendPort port) async {
+    final FlutterLocalNotificationsPlugin plugin =  FlutterLocalNotificationsPlugin();
+    while (true) {
+      
+      await Future.delayed(const Duration(seconds: 5));
+      final InitializationSettings initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
+        linux: initializationSettingsLinux,
+      );
+      await plugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
+          // Handle notification response
+          log('Notification tapped: ${notificationResponse.id}');
+        },
+      );
+      await NotificationService.showNotification(
+        plugin: plugin,
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title: 'Background Notification',
+        body: 'This is a notification from the background service!',
+      );
+      port.send('Background notification sent');
+    }
   }
  
 }

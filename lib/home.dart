@@ -29,9 +29,10 @@ class _HomeState extends State<Home> {
             FilledButton(
               onPressed: () {
                 NotificationService.showNotification(
-                  DateTime.now().millisecondsSinceEpoch.remainder(100000),
-                  'Hello',
-                  'This is a notification from the Notify App!',
+                  plugin: NotificationService.localNotificationsPlugin,
+                  id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+                  title:  'Hello',
+                  body:  'This is a notification from the Notify App!',
                 );
               },
               child: const Text('Press Me'),
