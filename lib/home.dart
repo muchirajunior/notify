@@ -27,7 +27,8 @@ class _HomeState extends State<Home> {
             ),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: () {
+              onPressed: () async{
+                await NotificationService.requestPermissions(); 
                 NotificationService.showNotification(
                   plugin: NotificationService.localNotificationsPlugin,
                   id: DateTime.now().millisecondsSinceEpoch.remainder(100000),

@@ -1,12 +1,12 @@
 import 'dart:developer';
-import 'dart:isolate';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class NotificationService {
   static FlutterLocalNotificationsPlugin localNotificationsPlugin =  FlutterLocalNotificationsPlugin();
 
-    static AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@minimap/ic_launcher');
+    static AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
     static   final DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
       requestSoundPermission: false,
@@ -57,41 +57,30 @@ class NotificationService {
     await plugin.show(id, title, body, platformChannelSpecifics);
   }
 
-
-  static Future<void> runBGService() async {
-    final ReceivePort receivePort = ReceivePort();
-    await Isolate.spawn(_backgroundHandler, receivePort.sendPort, debugName: 'NotificationServiceBackground');
-    receivePort.listen((dynamic message) {
-      // Handle messages from the background isolate
-      log('Message from background isolate: $message');
-    });
-  }
-
-  static Future<void> _backgroundHandler(SendPort port) async {
-    final FlutterLocalNotificationsPlugin plugin =  FlutterLocalNotificationsPlugin();
-    while (true) {
-      
-      await Future.delayed(const Duration(seconds: 5));
-      final InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsDarwin,
-        linux: initializationSettingsLinux,
-      );
-      await plugin.initialize(
-        initializationSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
-          // Handle notification response
-          log('Notification tapped: ${notificationResponse.id}');
-        },
-      );
-      await NotificationService.showNotification(
-        plugin: plugin,
-        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
-        title: 'Background Notification',
-        body: 'This is a notification from the background service!',
-      );
-      port.send('Background notification sent');
+  static Future<bool> requestPermissions() async {
+    try {
+     if(await Permission.notification.isDenied) {
+        final PermissionStatus status = await Permission.notification.request();
+        if (status.isGranted) {
+          log('Notification permission granted');
+        } else {
+          log('Notification permission denied');
+        }
+        return status.isGranted;
+      } else if (await Permission.notification.isPermanentlyDenied) {
+        log('Notification permission permanently denied');
+        return false;
+      } else {
+        log('Notification permission already granted');
+        return true;
+      }
+    } catch (e) {
+      log(e.toString(), name: 'NotificationService.requestPermissions');
+      return false;
     }
+
+  
   }
+
  
 }
