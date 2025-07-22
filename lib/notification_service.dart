@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:workmanager/workmanager.dart';
 
 class NotificationService {
   static FlutterLocalNotificationsPlugin localNotificationsPlugin =  FlutterLocalNotificationsPlugin();
@@ -78,9 +79,16 @@ class NotificationService {
       log(e.toString(), name: 'NotificationService.requestPermissions');
       return false;
     }
-
   
   }
 
+  @pragma('vm:entry-point')
+  static  void callbackDispatcher() {
+  Workmanager().executeTask((task, _) async {
+    log('Workmanager task executed: $task');
+    showNotification(plugin: localNotificationsPlugin, id: DateTime.now().microsecondsSinceEpoch, title: 'Hello User', body: 'This is a notification from the Notify App!');
+    return Future.value(true);
+  });
+}
  
 }
